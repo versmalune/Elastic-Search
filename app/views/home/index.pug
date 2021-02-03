@@ -1,0 +1,74 @@
+extends ../layouts/default.pug
+
+block page-header
+  h2 Dataset Search
+
+block content
+  .input-group
+    input#searchTitle.form-control.rounded(type='search' placeholder='Search' aria-label='Search' aria-describedby='search-addon')
+    button#searchButton.btn.btn-outline-primary(type='button') search
+  
+  #retrieveSummary(hidden=true)
+      p
+        span#retrievedCount
+        |  of #{datasets}
+
+  #tableDiv
+
+
+  script.
+    var searchText = '';
+    var query = {
+      "query": {
+        "multi_match": {
+          "query": '',
+          "fields": ["*"]
+        }
+      }
+    };
+
+    $("#searchButton").click(()=>{
+      searchText = $("#searchTitle").val();
+      query['query']['multi_match']['query'] = searchText;
+
+      $.ajax({
+        method: 'post',
+        url: "http://localhost:9200/datasets/_search",
+        contentType: 'application/json',
+        data: JSON.stringify(query),
+        success: function(data) {
+        var dataList = [];
+        dataList[0] = ["Score", "Name", "Description", "Keywords", "Data Catalog", "URL"];
+        var hitsArray = data.hits.hits;
+        var retrievedCount = data.hits.hits.length
+
+        hitsArray.forEach(function(eachDocument) {
+          dataList.push([eachDocument._score, eachDocument._source['name'], eachDocument._source['description'], eachDocument._source['keywords'], eachDocument._source['includedInDataCatalog']['name'], eachDocument._source['url']]);
+        });
+        var articlesTable = makeTable($("#tableDiv"), dataList);
+        $("#retrievedCount").text(retrievedCount)
+        $("#retrieveSummary").removeAttr('hidden');
+        },
+        error: function(xhr, status, error) {
+          console.log(xhr);
+        },
+      })     
+    })
+
+    function makeTable(container, data) {
+      var table = $("<table/>").addClass('table table-striped');
+      $.each(data, function(rowIndex, r) {
+        var row = $("<tr/>");
+        $.each(r, function(colIndex, c) {
+          if (colIndex == 5 && rowIndex != 0) {
+            row.append($("<td><a href='"+c+"'>"+c+"</a></td>"))
+          } else{
+            row.append($("<t"+(rowIndex == 0 ?  "h" : "d")+"/>").text(c));
+          }
+        });
+        table.append(row);
+      });
+      return container.html(table);
+    }
+
+    
